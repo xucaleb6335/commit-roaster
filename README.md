@@ -18,7 +18,8 @@ Proposal (one page): [`docs/Commit_Roaster_Proposal.docx`](docs/Commit_Roaster_P
 3. **OpenRouter**: create an API key at openrouter.ai/keys and set a credit limit.
 4. **Dify** (Dify Cloud is easiest):
    - Go to Settings, then Model Providers, then OpenRouter, and paste the OpenRouter key.
-   - Create a **Chat** app, choose an OpenRouter model, and give it a roast-persona system prompt.
+   - Create a **Chat** app, choose the model **`nvidia/nemotron-3.5-lightning:free`** (Nemotron 3.5 Lightning, free), and give it a roast-persona system prompt. If it isn't in Dify's OpenRouter model list, add it by that exact ID.
+   - Note: prompts sent to free OpenRouter endpoints may be logged by the provider. Don't roast repos that contain confidential commit messages.
    - Under **API Access**, create an API key (`app-...`) and paste it into `.env` as `DIFY_API_KEY`.
 5. **Activate the venv**: `.venv\Scripts\Activate.ps1`. If PowerShell blocks it, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
 
