@@ -23,13 +23,22 @@ Proposal (one page): [`docs/Commit_Roaster_Proposal.docx`](docs/Commit_Roaster_P
    - Under **API Access**, create an API key (`app-...`) and paste it into `.env` as `DIFY_API_KEY`.
 5. **Activate the venv**: `.venv\Scripts\Activate.ps1`. If PowerShell blocks it, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
 
+## Usage
+
+```powershell
+.venv\Scripts\Activate.ps1
+python roast.py                          # roast the repo in the current folder
+python roast.py --repo C:\code\my-app    # roast another repo
+python roast.py -n 10                    # only the last 10 commits
+python roast.py --dry-run                # show the prompt, don't call Dify
+```
+
 ## Layout
 
 ```
+roast.py                  The CLI: git log -> Dify -> roast in the terminal
 setup/setup_windows.ps1   Windows 11 environment setup
 docs/                     Proposal (.docx/.pdf) and pipeline diagram
 requirements.txt          requests, python-dotenv, rich
 .env.example              Config template (copy to .env, never commit .env)
 ```
-
-`roast.py` (the script itself) is the next milestone.
