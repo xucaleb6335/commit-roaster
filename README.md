@@ -31,13 +31,21 @@ python roast.py                          # roast the repo in the current folder
 python roast.py --repo C:\code\my-app    # roast another repo
 python roast.py -n 10                    # only the last 10 commits
 python roast.py --dry-run                # show the prompt, don't call Dify
+python roast.py --range main..HEAD       # only this branch's commits
 ```
+
+## GitHub Action: roast every pull request
+
+`.github/workflows/roast-pr.yml` roasts the commits in each pull request and posts the result as a PR comment, updating the same comment on new pushes.
+To turn it on, add your Dify app key as a repository secret named `DIFY_API_KEY` (Settings > Secrets and variables > Actions).
+If the secret is missing, or Dify is down, the workflow skips the roast without blocking the PR.
 
 ## Layout
 
 ```
 roast.py                  The CLI: git log -> Dify -> roast in the terminal
 setup/setup_windows.ps1   Windows 11 environment setup
+.github/workflows/        GitHub Action that roasts each pull request
 docs/                     Proposal (.docx/.pdf) and pipeline diagram
 requirements.txt          requests, python-dotenv, rich
 .env.example              Config template (copy to .env, never commit .env)

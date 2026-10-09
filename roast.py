@@ -4,6 +4,7 @@ Usage:
     python roast.py                      # roast the repo in the current folder
     python roast.py --repo C:\\code\\app -n 10
     python roast.py --dry-run            # show the prompt without calling Dify
+    python roast.py --range main..HEAD   # only the commits on this branch (used by CI)
 """
 
 import argparse
@@ -37,17 +38,24 @@ def parse_args():
     parser.add_argument("--repo", default=".", help="path to a Git repository (default: current folder)")
     parser.add_argument("-n", "--count", type=int, default=int(os.getenv("COMMIT_COUNT", "20")),
                         help="number of commits to roast (default: 20)")
+    parser.add_argument("--range", dest="rev_range",
+                        help="git revision range to roast, e.g. main..HEAD (default: latest commits)")
+    parser.add_argument("--output", type=Path, help="also write the roast (Markdown) to this file")
     parser.add_argument("--dry-run", action="store_true", help="print the prompt and exit without calling Dify")
     args = parser.parse_args()
     if args.count < 1:
         parser.error("--count must be at least 1")
+    if args.rev_range and args.rev_range.startswith("-"):
+        parser.error("--range must be a revision range like main..HEAD")
     return args
 
 
-def read_commits(repo, count):
+def read_commits(repo, count, rev_range=None):
     """Return a list of (short_hash, author, age, subject) for the latest commits."""
     cmd = ["git", "-C", repo, "log", f"-n{count}",
            f"--pretty=format:%h{FIELD_SEP}%an{FIELD_SEP}%ar{FIELD_SEP}%s"]
+    if rev_range:
+        cmd += [rev_range, "--"]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     except FileNotFoundError:
@@ -62,12 +70,14 @@ def read_commits(repo, count):
         raise RoastError(f"git log failed: {stderr}")
 
     commits = [line.split(FIELD_SEP, 3) for line in result.stdout.splitlines() if line.strip()]
+    if not commits and rev_range:
+        raise RoastError(f"No commits in range {rev_range}. Nothing to roast.")
     if not commits:
         raise RoastError(f"'{repo}' has no commits yet. Nothing to roast.")
     return commits
 
 
-def build_prompt(repo, commits):
+def build_prompt(repo, commits, rev_range=None):
     repo_name = Path(repo).resolve().name
     lines = []
     for i, (short_hash, author, age, subject) in enumerate(commits, 1):
@@ -75,7 +85,12 @@ def build_prompt(repo, commits):
             subject = subject[:MAX_SUBJECT_CHARS] + "..."
         lines.append(f"{i}. [{short_hash}] {subject} ({author}, {age})")
 
-    header = f"Roast these {len(commits)} most recent commit messages from the repo '{repo_name}':\n\n"
+    if rev_range:
+        short_range = re.sub(r"\b([0-9a-f]{7})[0-9a-f]{33}\b", r"\1", rev_range)
+        source = f"the branch range {short_range}"
+    else:
+        source = "the latest history"
+    header = f"Roast these {len(commits)} commit messages from {source} of the repo '{repo_name}':\n\n"
     body = "\n".join(lines)
     if len(header) + len(body) > MAX_PROMPT_CHARS:
         body = body[:MAX_PROMPT_CHARS - len(header)].rsplit("\n", 1)[0] + "\n(...list trimmed)"
@@ -123,8 +138,8 @@ def main():
     load_dotenv(Path(__file__).resolve().parent / ".env")
     args = parse_args()
     try:
-        commits = read_commits(args.repo, args.count)
-        prompt = build_prompt(args.repo, commits)
+        commits = read_commits(args.repo, args.count, args.rev_range)
+        prompt = build_prompt(args.repo, commits, args.rev_range)
         if args.dry_run:
             console.print(Panel(Text(prompt), title="Prompt (dry run)", border_style="cyan"))
             return 0
@@ -135,6 +150,8 @@ def main():
         return 1
 
     console.print(Panel(Markdown(roast), title="Commit Roast", border_style="red"))
+    if args.output:
+        args.output.write_text(roast + "\n", encoding="utf-8")
     return 0
 
 
