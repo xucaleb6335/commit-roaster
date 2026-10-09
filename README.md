@@ -1,52 +1,108 @@
-# Commit Roaster (AI-Project-1)
+# Commit Roaster 🔥
 
-A Python command-line tool that reads the last 20 commit messages from a Git repo and has an LLM roast them.
-The LLM runs behind a [Dify](https://dify.ai) app that uses an [OpenRouter](https://openrouter.ai) API key.
+We've all written a commit called `fix`. Maybe `wip`. Maybe, at 2am, `asdf please work`.
 
-![Pipeline](docs/pipeline.png)
+Commit Roaster is an AI agent that reads your Git history, opens up the commits that look suspicious, checks them against real commit-message guidelines, and then roasts you for them. It's funny, but it's also useful: every burn cites the rule you broke, and it suggests a better message for your worst commits.
 
-Proposal (one page): [`docs/Commit_Roaster_Proposal.docx`](docs/Commit_Roaster_Proposal.docx) / [`.pdf`](docs/Commit_Roaster_Proposal.pdf)
+It runs in your terminal, and it can also review every pull request automatically through GitHub Actions. The default model is NVIDIA Nemotron on OpenRouter's free tier, so a review costs $0.
 
-## Setup on Windows 11
+![How Commit Roaster works](docs/architecture.png)
 
-1. **Clone** this repo, then open PowerShell in the repo folder.
-2. **Run the setup script**. It prints your PC specs to `setup\system-info.txt`, installs Python 3.12, Git and VS Code with winget, creates `.venv`, installs `requirements.txt` and copies `.env.example` to `.env`:
+## What a roast looks like
+
+```
+  tool call: read_git_history()
+  tool call: inspect_commit(commit_hash='31f90eb')
+  tool call: search_commit_guidelines(query='small tweak many files')
+╭──────────────────────────────── Commit Roast ────────────────────────────────╮
+│ [31f90eb] "small tweak" - It touched 10 files. That is not a tweak, that is  │
+│ a renovation [BP-06].                                                        │
+│                                                                              │
+│ Verdict: This branch reads like a hostage note.                              │
+│ Score: 2/10                                                                  │
+│                                                                              │
+│ Fixes:                                                                       │
+│  • feat(core): add file generators for modules 0-3 [CC-03]                   │
+│                                                                              │
+│ Sources                                                                      │
+│  • [BP-06] Match the message to the size of the change                       │
+│  • [CC-03] Other common types                                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+## How it works
+
+The agent is a [LangGraph](https://github.com/langchain-ai/langgraph) state graph (`commit_roaster/agent.py`). The model doesn't get your commits pasted into a prompt. It gets three tools and decides for itself how to use them:
+
+| Tool | What it does |
+|---|---|
+| `read_git_history` | Runs `git log` on the repo (or just the PR's commits in CI) |
+| `inspect_commit` | Runs `git show --stat` on one commit, so the agent can see that "small tweak" actually touched 40 files |
+| `search_commit_guidelines` | Retrieval over a small knowledge base of Conventional Commits rules and commit best practices (BM25 ranking) |
+
+That last tool is the RAG part. The knowledge base lives in [`knowledge/`](knowledge/) as plain Markdown, where every section is one retrievable chunk with an ID like `[BP-05]`. When the agent finishes, a `finalize` step strips any citation that doesn't exist in the knowledge base (models do make these up) and adds a Sources list.
+
+A few guardrails keep a small free model from going off the rails:
+- **Step budget:** after 8 rounds of tool calls, the agent has to write its answer.
+- **Nudge:** if it tries to review without reading the history first, it gets told to go read it.
+- **Diff limit:** it can open at most 4 diffs per run, and big diffs are truncated.
+- **Retries:** rate limits (429) and timeouts are retried with backoff, and anything that still fails comes back as a readable error, not a stack trace.
+
+There's also a **simple mode** (plain `python roast.py`) that sends the commit list to a [Dify](https://dify.ai) chat app in a single call. That's how this project started, and it's handy when you want to tweak the prompt in Dify's UI without touching code.
+
+## Getting started (Windows 11)
+
+1. Clone the repo and open PowerShell in the folder.
+2. Run the setup script. It installs Python 3.12, Git and VS Code if you don't have them, creates a virtual environment, installs the dependencies and creates your `.env` file:
    ```powershell
    powershell -ExecutionPolicy Bypass -File setup\setup_windows.ps1
    ```
-   Flags: `-SkipInstall` only builds the venv. `-WithDocker` also installs Docker Desktop, which you only need to self-host Dify.
-3. **OpenRouter**: create an API key at openrouter.ai/keys and set a credit limit.
-4. **Dify** (Dify Cloud is easiest):
-   - Go to Settings, then Model Providers, then OpenRouter, and paste the OpenRouter key.
-   - Create a **Chat** app, choose the model **`nvidia/nemotron-3.5-lightning:free`** (Nemotron 3.5 Lightning, free), and give it a roast-persona system prompt. If it isn't in Dify's OpenRouter model list, add it by that exact ID.
-   - Note: prompts sent to free OpenRouter endpoints may be logged by the provider. Don't roast repos that contain confidential commit messages.
-   - Under **API Access**, create an API key (`app-...`) and paste it into `.env` as `DIFY_API_KEY`.
-5. **Activate the venv**: `.venv\Scripts\Activate.ps1`. If PowerShell blocks it, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
+3. Get a free API key at [openrouter.ai/keys](https://openrouter.ai/keys) and put it in `.env` as `OPENROUTER_API_KEY`.
+4. Activate the environment and roast something:
+   ```powershell
+   .venv\Scripts\Activate.ps1
+   python roast.py --agent
+   ```
+
+If PowerShell refuses to run `Activate.ps1`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once. On macOS or Linux, skip the setup script and run `python -m venv .venv && .venv/bin/pip install -r requirements.txt`.
 
 ## Usage
 
 ```powershell
-.venv\Scripts\Activate.ps1
-python roast.py                          # roast the repo in the current folder
-python roast.py --repo C:\code\my-app    # roast another repo
-python roast.py -n 10                    # only the last 10 commits
-python roast.py --dry-run                # show the prompt, don't call Dify
-python roast.py --range main..HEAD       # only this branch's commits
+python roast.py --agent                         # the agent, on the current repo
+python roast.py --agent --repo C:\code\my-app   # some other repo
+python roast.py --agent -n 10                   # only the last 10 commits
+python roast.py --agent --range main..HEAD      # only what's on your branch
+python roast.py                                 # simple mode through Dify
+python roast.py --dry-run                       # show what would be sent, call nothing
 ```
 
-## GitHub Action: roast every pull request
+You can switch models with `OPENROUTER_MODEL` in `.env`; any OpenRouter model with tool-calling support works. Free models' prompts may be logged by the provider, so don't point this at a repo with confidential commit messages.
 
-`.github/workflows/roast-pr.yml` roasts the commits in each pull request and posts the result as a PR comment, updating the same comment on new pushes.
-To turn it on, add your Dify app key as a repository secret named `DIFY_API_KEY` (Settings > Secrets and variables > Actions).
-If the secret is missing, or Dify is down, the workflow skips the roast without blocking the PR.
+## Roasting pull requests automatically
 
-## Layout
+[`.github/workflows/roast-pr.yml`](.github/workflows/roast-pr.yml) runs the agent on the commits in every pull request and posts the review as a comment. When you push more commits, it updates that same comment instead of adding a new one. To turn it on, add `OPENROUTER_API_KEY` as a repository secret (**Settings → Secrets and variables → Actions**). If the key is missing, or the model is having a bad day, the workflow skips quietly and never blocks a merge.
+
+## Tests
+
+```powershell
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+The tests don't call any real API. The agent is driven by a scripted fake model, and the HTTP tests run the real OpenAI client against a local fake OpenRouter server, so tool calling, 429 retries and auth errors are all tested over HTTP. They also run on every push via [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
+
+## Project layout
 
 ```
-roast.py                  The CLI: git log -> Dify -> roast in the terminal
-setup/setup_windows.ps1   Windows 11 environment setup
-.github/workflows/        GitHub Action that roasts each pull request
-docs/                     Proposal (.docx/.pdf) and pipeline diagram
-requirements.txt          requests, python-dotenv, rich
-.env.example              Config template (copy to .env, never commit .env)
+roast.py                     command-line entry point
+commit_roaster/agent.py      LangGraph agent, tools, guardrails, citation check
+commit_roaster/knowledge.py  knowledge base loading + BM25 retrieval (RAG)
+commit_roaster/git_tools.py  git log / git show helpers
+commit_roaster/dify.py       simple mode (Dify chat app)
+knowledge/                   the guidelines the agent cites
+tests/                       pytest suite
+.github/workflows/           PR roaster + test CI
+setup/setup_windows.ps1      one-command Windows setup
+docs/                        architecture diagram and the original project proposal
 ```

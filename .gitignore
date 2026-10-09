@@ -14,3 +14,7 @@ setup/system-info.txt
 .idea/
 Thumbs.db
 .DS_Store
+
+# Generated output
+roast.md
+.pytest_cache/

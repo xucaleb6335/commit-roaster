@@ -1,7 +1,8 @@
-# Roasts the commit messages in every pull request and posts the result as a PR comment.
+# Reviews the commit messages in every pull request and posts the result as a PR comment.
 # Setup: repo Settings > Secrets and variables > Actions > New repository secret
-#   DIFY_API_KEY   your Dify app key (app-...)
-# Optional repository variable DIFY_BASE_URL if you self-host Dify.
+#   OPENROUTER_API_KEY  runs the LangGraph agent (tool calling + RAG)   <- recommended
+#   DIFY_API_KEY        runs simple mode through your Dify app (used if no OpenRouter key)
+# Optional repository variables: OPENROUTER_MODEL, DIFY_BASE_URL.
 
 name: Roast PR commits
 
@@ -21,40 +22,46 @@ jobs:
   roast:
     runs-on: ubuntu-latest
     env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free' }}
       DIFY_API_KEY: ${{ secrets.DIFY_API_KEY }}
       DIFY_BASE_URL: ${{ vars.DIFY_BASE_URL || 'https://api.dify.ai/v1' }}
+      HAS_KEY: ${{ secrets.OPENROUTER_API_KEY != '' || secrets.DIFY_API_KEY != '' }}
     steps:
-      - name: Skip when the Dify key is unavailable
-        if: env.DIFY_API_KEY == ''
-        run: echo "::notice::DIFY_API_KEY secret is not set (or this PR comes from a fork), so no roast this time."
+      - name: Skip when no API key is available
+        if: env.HAS_KEY != 'true'
+        run: echo "::notice::No OPENROUTER_API_KEY or DIFY_API_KEY secret (or this PR comes from a fork), so no roast this time."
 
       - uses: actions/checkout@v7
-        if: env.DIFY_API_KEY != ''
+        if: env.HAS_KEY == 'true'
         with:
           fetch-depth: 0
 
       - uses: actions/setup-python@v7
-        if: env.DIFY_API_KEY != ''
+        if: env.HAS_KEY == 'true'
         with:
           python-version: "3.12"
           cache: pip
 
       - name: Install dependencies
-        if: env.DIFY_API_KEY != ''
+        if: env.HAS_KEY == 'true'
         run: pip install -r requirements.txt
 
       - name: Roast the commits in this PR
-        if: env.DIFY_API_KEY != ''
-        # A Dify outage or rate limit should not block merging.
+        if: env.HAS_KEY == 'true'
+        # A model outage or rate limit should not block merging.
         continue-on-error: true
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           COLUMNS: "120"
-        run: python roast.py --range "$BASE_SHA..$HEAD_SHA" --output roast.md
+        run: |
+          MODE=""
+          if [ -n "$OPENROUTER_API_KEY" ]; then MODE="--agent"; fi
+          python roast.py $MODE --range "$BASE_SHA..$HEAD_SHA" --output roast.md
 
       - name: Post or update the PR comment
-        if: env.DIFY_API_KEY != '' && hashFiles('roast.md') != ''
+        if: env.HAS_KEY == 'true' && hashFiles('roast.md') != ''
         uses: actions/github-script@v9
         with:
           script: |
