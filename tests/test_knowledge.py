@@ -23,6 +23,8 @@ def test_every_section_becomes_a_chunk_with_unique_id():
     ("small tweak huge change many files", "BP-06"),
     ("subject line too long", "BP-02"),
     ("feat vs fix version bump", "CC-02"),
+    ("typo misspelled udpate", "BP-13"),
+    ("venting blame stupid api", "BP-14"),
 ])
 def test_search_ranks_the_right_rule_first(kb, query, expected):
     assert kb.search(query)[0].id == expected

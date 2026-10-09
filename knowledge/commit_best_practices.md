@@ -56,3 +56,13 @@ Skip emoji spam, all-caps shouting and jokes that hide the meaning of the change
 ## [BP-12] Merge and revert messages
 Keep Git's default "Merge branch ..." and "Revert ..." messages, but add a line explaining why a
 revert was needed. A revert without a reason invites someone to re-apply the broken change later.
+
+## [BP-13] Proofread before committing
+Typos and misspellings in commit messages ("fxi", "udpate", "refacor") make history harder to search
+and suggest the change was rushed. `git log --grep` cannot find a misspelled keyword. Read the subject
+once before committing, or let your editor's spell checker run on the commit message.
+
+## [BP-14] Stay professional, no venting or blame
+Commit messages are permanent and public to everyone with access to the repo. Messages that vent
+("ugh this stupid API", "why does this even work") or blame a person ("fix Bob's mess") add no
+information and age badly. Describe the problem and the fix; leave the frustration out.

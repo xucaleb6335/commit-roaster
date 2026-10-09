@@ -53,7 +53,7 @@ box(58.5, 13.5, 15.5, 7.5, "search_guidelines", "BM25 retrieval", PURPLE, title_
 
 # Data sources
 box(25.5, 3.5, 31.5, 7, "Git repository", "commit messages + diffs", GRAY)
-box(58.5, 3.5, 15.5, 7, "Knowledge base", "22 rules (RAG)", PURPLE, title_size=7.6)
+box(58.5, 3.5, 15.5, 7, "Knowledge base", "24 rules (RAG)", PURPLE, title_size=7.6)
 
 # Model side
 box(80, 39, 19, 9.5, "OpenRouter", "chat + tool schemas,\nretries on 429/timeouts", "#B5476B")
