@@ -98,6 +98,10 @@ python -m pytest
 
 The tests don't call any real API. The agent is driven by a scripted fake model, and the HTTP tests run the real OpenAI client against a local fake OpenRouter server, so tool calling, 429 retries and auth errors are all tested over HTTP. They also run on every push via [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
 
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the commit style (yes, it's enforced, by roasting).
+
 ## Project layout
 
 ```
