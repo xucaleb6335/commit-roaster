@@ -7,6 +7,7 @@ Usage:
     python roast.py --repo C:\\code\\app -n 10
     python roast.py --range main..HEAD   # only the commits on this branch (used by CI)
     python roast.py --dry-run            # show the prompt without calling a model
+    python roast.py --lint               # instant offline check against Conventional Commits, no LLM
 """
 
 import argparse
@@ -19,6 +20,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.markup import escape
 from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
 
 from commit_roaster import RoastError
@@ -32,6 +34,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Roast a Git repo's recent commit messages.")
     parser.add_argument("--agent", action="store_true",
                         help="use the LangGraph agent (tool calling + RAG) via OpenRouter instead of Dify")
+    parser.add_argument("--lint", action="store_true",
+                        help="check messages against Conventional Commits offline (no API key, exit 1 on problems)")
     parser.add_argument("--model", help="OpenRouter model for --agent (overrides OPENROUTER_MODEL in .env)")
     parser.add_argument("--repo", default=".", help="path to a Git repository (default: current folder)")
     parser.add_argument("-n", "--count", type=int, default=int(os.getenv("COMMIT_COUNT", "20")),
@@ -67,6 +71,23 @@ def roast_with_agent(args):
     return result.review
 
 
+def lint(args):
+    from commit_roaster.lint import lint_commits
+
+    results = lint_commits(read_commits(args.repo, args.count, args.rev_range))
+    table = Table(title="Commit lint", show_lines=False)
+    table.add_column("Commit", style="cyan", no_wrap=True)
+    table.add_column("Message")
+    table.add_column("Problems")
+    for short_hash, subject, problems in results:
+        found = "\n".join(f"[{rule}] {text}" for rule, text in problems)
+        table.add_row(short_hash, escape(subject), Text(found, style="red") if problems else Text("ok", style="green"))
+    console.print(table)
+    clean = sum(1 for *_, problems in results if not problems)
+    console.print(f"{clean}/{len(results)} commits pass. Run with --agent for the full roast.")
+    return 0 if clean == len(results) else 1
+
+
 def roast_with_dify(args):
     commits = read_commits(args.repo, args.count, args.rev_range)
     prompt = build_prompt(args.repo, commits, args.rev_range)
@@ -81,6 +102,8 @@ def main():
     load_dotenv(Path(__file__).resolve().parent / ".env")
     args = parse_args()
     try:
+        if args.lint:
+            return lint(args)
         roast = roast_with_agent(args) if args.agent else roast_with_dify(args)
     except RoastError as err:
         console.print(f"[bold red]Error:[/] {escape(str(err))}")

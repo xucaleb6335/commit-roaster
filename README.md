@@ -80,6 +80,7 @@ python roast.py --agent --range main..HEAD      # only what's on your branch
 python roast.py --agent --model nvidia/nemotron-3-super-120b-a12b:free   # try another model
 python roast.py                                 # simple mode through Dify
 python roast.py --dry-run                       # show what would be sent, call nothing
+python roast.py --lint                          # instant offline Conventional Commits check, no API key
 ```
 
 You can switch models with `OPENROUTER_MODEL` in `.env`; any OpenRouter model with tool-calling support works. Free models' prompts may be logged by the provider, so don't point this at a repo with confidential commit messages.
