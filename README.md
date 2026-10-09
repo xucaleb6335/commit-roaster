@@ -1,5 +1,9 @@
 # Commit Roaster 🔥
 
+[![Tests](https://github.com/xucaleb6335/AI-Project-1/actions/workflows/tests.yml/badge.svg)](https://github.com/xucaleb6335/AI-Project-1/actions/workflows/tests.yml)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
+![LangGraph](https://img.shields.io/badge/agent-LangGraph-orange)
+
 We've all written a commit called `fix`. Maybe `wip`. Maybe, at 2am, `asdf please work`.
 
 Commit Roaster is an AI agent that reads your Git history, opens up the commits that look suspicious, checks them against real commit-message guidelines, and then roasts you for them. It's funny, but it's also useful: every burn cites the rule you broke, and it suggests a better message for your worst commits.
