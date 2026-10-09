@@ -2,6 +2,7 @@
 
 Usage:
     python roast.py --agent              # LangGraph agent: inspects diffs, cites guidelines (OpenRouter)
+    python roast.py --agent --model nvidia/nemotron-3-super-120b-a12b:free
     python roast.py                      # simple mode: one call to your Dify app
     python roast.py --repo C:\\code\\app -n 10
     python roast.py --range main..HEAD   # only the commits on this branch (used by CI)
@@ -31,6 +32,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Roast a Git repo's recent commit messages.")
     parser.add_argument("--agent", action="store_true",
                         help="use the LangGraph agent (tool calling + RAG) via OpenRouter instead of Dify")
+    parser.add_argument("--model", help="OpenRouter model for --agent (overrides OPENROUTER_MODEL in .env)")
     parser.add_argument("--repo", default=".", help="path to a Git repository (default: current folder)")
     parser.add_argument("-n", "--count", type=int, default=int(os.getenv("COMMIT_COUNT", "20")),
                         help="number of commits to roast (default: 20)")
@@ -43,6 +45,8 @@ def parse_args():
         parser.error("--count must be at least 1")
     if args.rev_range and args.rev_range.startswith("-"):
         parser.error("--range must be a revision range like main..HEAD")
+    if args.model and not args.agent:
+        parser.error("--model only applies to --agent (in simple mode the model is chosen in Dify)")
     return args
 
 
@@ -52,6 +56,8 @@ def roast_with_agent(args):
     if args.dry_run:
         console.print(Panel(Text(SYSTEM_PROMPT), title="Agent system prompt (dry run)", border_style="cyan"))
         return None
+    if args.model:
+        os.environ["OPENROUTER_MODEL"] = args.model
     llm = make_llm()
     with console.status("Agent is investigating the commits...") as status:
         def show(call):

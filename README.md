@@ -77,6 +77,7 @@ python roast.py --agent                         # the agent, on the current repo
 python roast.py --agent --repo C:\code\my-app   # some other repo
 python roast.py --agent -n 10                   # only the last 10 commits
 python roast.py --agent --range main..HEAD      # only what's on your branch
+python roast.py --agent --model nvidia/nemotron-3-super-120b-a12b:free   # try another model
 python roast.py                                 # simple mode through Dify
 python roast.py --dry-run                       # show what would be sent, call nothing
 ```
